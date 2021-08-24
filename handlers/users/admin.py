@@ -36,9 +36,10 @@ async def mailing(m: types.Message):
 @dp.message_handler(state=Mailing.text)
 async def broadcast(m: types.Message, state: FSMContext):
     count = 0
+    message = f'<b>FROM ADMIN: </b>\n{m.text}'
     try:
         for user in await User.all():
-            if await send_message(user.user_id, m.text, m.bot):
+            if await send_message(user.user_id, message, m.bot):
                 count += 1
             await asyncio.sleep(.05)
     finally:
