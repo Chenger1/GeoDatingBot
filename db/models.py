@@ -24,7 +24,7 @@ class User(Model):
         """
         Get users that are not disliked by current user.
         """
-        queryset = User.filter(pk__not=self.pk)
+        queryset = User.filter(pk__not=self.pk, gender=self.interested_gender)
         rate_queryset = await Rate.filter(rate_owner=self, type=False)
         if rate_queryset:
             queryset = queryset.filter(as_target__not_in=rate_queryset)
