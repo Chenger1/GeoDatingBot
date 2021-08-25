@@ -41,6 +41,7 @@ async def set_rate(m: types.Message, state: FSMContext, rate_type: bool) -> bool
         if index < len(data['users_list'])-1:
             index += 1
         else:
+            await pair_likes(user, me, m)
             return False
         user_info, photo_id = await get_user_info(data['users_list'][index], m.from_user.id)
         await m.delete()
@@ -84,6 +85,16 @@ async def display_liked_users(m: types.Message, state: FSMContext):
         await m.answer('You haven`t liked anyone yet')
         return
     await process_list_of_users(liked_users, m, state)
+
+
+@dp.message_handler(Text(equals=['Display my likers']))
+async def display_user_likers(m: types.Message, state: FSMContext):
+    user = await User.get(user_id=m.from_user.id)
+    matched_users = await user.get_user_likers()
+    if not matched_users:
+        await m.answer('You don`t liked yet.')
+        return
+    await process_list_of_users(matched_users, m, state)
 
 
 @dp.message_handler(Text(equals=['Display users']))

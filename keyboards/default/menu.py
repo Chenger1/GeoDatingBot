@@ -5,7 +5,8 @@ from emoji import emojize
 
 level_1 = ReplyKeyboardMarkup(resize_keyboard=True).add(
     KeyboardButton('Display users'),
-    KeyboardButton('Display liked users')
+    KeyboardButton('Display liked users'),
+    KeyboardButton('Display my likers')
 ).add(
     KeyboardButton('Edit info'),
     KeyboardButton('Remove dislikes')

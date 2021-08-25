@@ -61,6 +61,13 @@ class User(Model):
             users.append(user.user_id)
         return users
 
+    async def get_user_likers(self) -> list:
+        users = []
+        for rate in await self.as_target.all():
+            await rate.fetch_related('rate_owner')
+            users.append(rate.rate_owner.user_id)
+        return users
+
     async def find_nearest(self) -> int:
         """
         Find nearest person from db. IMPORTANT - this person is not disliked by current user
