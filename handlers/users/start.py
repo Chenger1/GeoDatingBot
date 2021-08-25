@@ -10,7 +10,7 @@ from keyboards.dispatcher import dispatcher
 from states.state_groups import CustomUser
 
 from db.models import User, Rate, RequestToAdmin
-from data.config import check_if_user_is_admin
+from data.config import check_if_user_is_admin, ADMINS
 
 import random
 
@@ -89,3 +89,4 @@ async def request_admin_status(m: types.Message):
         await m.answer('You already sent request. Wait for response')
         return
     await m.answer('Request has been created. Wait for response')
+    await m.bot.send_message(chat_id=ADMINS[0], text='You have request to admin')
