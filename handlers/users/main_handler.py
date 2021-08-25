@@ -4,7 +4,6 @@ from aiogram.dispatcher.filters.builtin import Text
 from aiogram.utils import exceptions
 from loader import dp, log
 
-from keyboards.inline.user_info_keyboard import confirm_keyboard, item_cb, get_user_profile_keyboard, like_dislike_cb
 from keyboards.dispatcher import dispatcher
 
 from db.models import User, Rate
