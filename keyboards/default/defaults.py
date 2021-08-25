@@ -3,6 +3,8 @@ from aiogram.types import ReplyKeyboardMarkup, KeyboardButton
 
 geo_keyboard = ReplyKeyboardMarkup(resize_keyboard=True).add(
     KeyboardButton('Share location', request_location=True)
+).add(
+    KeyboardButton('Back to menu')
 )
 
 

@@ -44,6 +44,12 @@ async def back_button(m: types.Message, state: FSMContext):
     await m.answer('Returning...', reply_markup=keyboard)
 
 
+@dp.message_handler(Text(equals=['Back to menu']), state=UserInfoState.geolocation)
+async def back_from_geolocation_button(m: types.Message):
+    await m.answer('Menu', reply_markup=user_info_keyboard)
+    await UserInfoState.starter.set()
+
+
 @dp.message_handler(Text(equals=['Age']), state=UserInfoState)
 async def user_gender(m: types.Message, state: FSMContext):
     data = await state.get_data()
@@ -246,7 +252,7 @@ async def profile_location(m: types.Message, state: FSMContext):
             await m.answer(text, reply_markup=user_info_keyboard)
             await UserInfoState.search_distance.set()
         else:
-            await m.answer('Success')
+            await m.answer('Success', reply_markup=user_info_keyboard)
 
 
 @dp.message_handler(state=UserInfoState.search_distance)
