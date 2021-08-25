@@ -67,28 +67,15 @@ async def display_matched_users(m: types.Message, state: FSMContext):
             await m.answer('There are no any users in this area.')
         return
     log.info(f'Founded: {len(matched_users)} for {m.from_user.id}')
-    await m.answer(f'Founded {len(matched_users)} users.\nDo you want to see their profiles?',
-                   reply_markup=confirm_keyboard)
-    await ListProfiles.confirm.set()
-    await state.update_data(users_list=matched_users)
-
-
-@dp.callback_query_handler(item_cb.filter(action='confirm'), state=ListProfiles.confirm)
-async def confirm_list_profiles(call: types.CallbackQuery, callback_data: dict, state: FSMContext):
-    value = bool(int(callback_data.get('value')))
-    if not value:
-        await state.finish()
-        await call.answer('Canceled')
-        return
+    keyboard, prev_level = await dispatcher('LEVEL_2_PROFILES')
+    await m.answer(f'Founded {len(matched_users)} users',
+                   reply_markup=keyboard)
     async with state.proxy() as data:
-        users_list = data['users_list']
-        menu_keyboard, prev_level = await dispatcher('LEVEL_2_PROFILES')
+        data['users_list'] = matched_users
         data['prev_level'] = prev_level
-        user_info, photo_id, keyboard = await get_user_info(users_list[0], 0, call.from_user.id)
-        await call.bot.send_message(chat_id=call.from_user.id, text='Profiles: ', reply_markup=menu_keyboard)
-        await call.bot.send_photo(photo=photo_id, caption=user_info, reply_markup=keyboard,
-                                  chat_id=call.from_user.id)
-        await call.answer()
+        user_info, photo_id, keyboard = await get_user_info(matched_users[0], 0, m.from_user.id)
+        await m.bot.send_photo(photo=photo_id, caption=user_info, reply_markup=keyboard,
+                               chat_id=m.from_user.id)
         await ListProfiles.main.set()
 
 

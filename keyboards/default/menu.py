@@ -1,5 +1,7 @@
 from aiogram.types import ReplyKeyboardMarkup, KeyboardButton
 
+from emoji import emojize
+
 
 level_1 = ReplyKeyboardMarkup(resize_keyboard=True).add(
     KeyboardButton('Display users'),
@@ -25,5 +27,8 @@ level_2_admin = ReplyKeyboardMarkup(resize_keyboard=True).add(
 
 
 level_2_profiles = ReplyKeyboardMarkup(resize_keyboard=True).add(
+    KeyboardButton(emojize(':thumbs_down:')),
+    KeyboardButton(emojize(':thumbs_up:'))
+).add(
     KeyboardButton('Back')
 )
