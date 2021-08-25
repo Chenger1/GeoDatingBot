@@ -13,23 +13,44 @@ from handlers.users.utils import prepare_user_profile
 from states.state_groups import ListProfiles
 
 
-async def get_user_info(user_id: int, index: int, me: int) -> tuple[str, str, types.InlineKeyboardMarkup]:
+async def get_user_info(user_id: int, me: int) -> tuple[str, str]:
     user_info, photo_id, liked = await prepare_user_profile(user_id, me)
-    keyboard = await get_user_profile_keyboard(user_id, index, liked)
-    return user_info, photo_id, keyboard
+    return user_info, photo_id
 
 
-async def pair_likes(user: User, me: User, call: types.CallbackQuery):
+async def pair_likes(user: User, me: User, m: types.Message):
     if await Rate.filter(rate_owner=user, target=me, type=True).exists():
         try:
-            await call.bot.send_message(chat_id=me.user_id,
-                                        text=f'This user ({user.full_name}) is also liked you.\n' +
-                                             f'See user`s profile: @{user.username}')
-            await call.bot.send_message(chat_id=user.user_id,
-                                        text=f'You have been liked by: @{me.username} too. ({me.full_name})')
+            await m.bot.send_message(chat_id=me.user_id,
+                                     text=f'This user ({user.full_name}) is also liked you.\n' +
+                                          f'See user`s profile: @{user.username}')
+            await m.bot.send_message(chat_id=user.user_id,
+                                     text=f'You have been liked by: @{me.username} too. ({me.full_name})')
         except exceptions.ChatNotFound:
             log.info(f'{user.user_id} char was not found')
-            await call.message.answer('You liked test user. So here may be a username of real user')
+            await m.answer('You liked test user. So here may be a username of real user')
+
+
+async def set_rate(m: types.Message, state: FSMContext, rate_type: bool) -> bool:
+    me = await User.get(user_id=m.from_user.id)
+    async with state.proxy() as data:
+        index = int(data['current_user_index'])
+        current_user = data['users_list'][index]
+        user = await User.get(user_id=current_user)
+        await Rate.get_or_create(rate_owner=me, target=user, type=rate_type)
+
+        if index < len(data['users_list'])-1:
+            index += 1
+        else:
+            return False
+        user_info, photo_id = await get_user_info(data['users_list'][index], m.from_user.id)
+        await m.delete()
+        await m.bot.send_photo(
+            chat_id=me.user_id, photo=photo_id, caption=user_info
+        )
+        data['current_user_index'] = index
+        await pair_likes(user, me, m)
+        return True
 
 
 @dp.message_handler(Text(equals=['Remove dislikes']))
@@ -73,60 +94,20 @@ async def display_matched_users(m: types.Message, state: FSMContext):
     async with state.proxy() as data:
         data['users_list'] = matched_users
         data['prev_level'] = prev_level
-        user_info, photo_id, keyboard = await get_user_info(matched_users[0], 0, m.from_user.id)
-        await m.bot.send_photo(photo=photo_id, caption=user_info, reply_markup=keyboard,
-                               chat_id=m.from_user.id)
+        data['current_user_index'] = 0
+        user_info, photo_id = await get_user_info(matched_users[0], m.from_user.id)
+        message = await m.bot.send_photo(photo=photo_id, caption=user_info, chat_id=m.from_user.id)
         await ListProfiles.main.set()
+        data['message_id'] = message.message_id
 
 
-@dp.callback_query_handler(item_cb.filter(action='get_page'), state=ListProfiles.main)
-async def get_profiles_page(call: types.CallbackQuery, callback_data: dict, state: FSMContext):
-    index = int(callback_data.get('value', 0))
-    async with state.proxy() as data:
-        users_list = data['users_list']
-        if not users_list:
-            await call.message.delete()
-            await call.bot.send_message(chat_id=call.from_user.id, text='There are not users')
-        if index < 0 or index > len(users_list)-1:
-            await call.answer('There is no page')
-            return
-        user_info, photo_id, keyboard = await get_user_info(users_list[index], index, call.from_user.id)
-        await call.message.edit_media(
-            types.input_media.InputMediaPhoto(media=photo_id, caption=user_info),
-            reply_markup=keyboard)
-        await call.answer()
+@dp.message_handler(Text(equals=['👍']), state=ListProfiles.main)
+async def like(m: types.Message, state: FSMContext):
+    if not await set_rate(m, state, True):
+        await m.answer('There are no any users more')
 
 
-@dp.callback_query_handler(like_dislike_cb.filter(action='like_dislike'), state=ListProfiles.main)
-async def like_dislike(call: types.CallbackQuery, callback_data: dict, state: FSMContext):
-    user_id = callback_data['user_id']
-    action_type = bool(int(callback_data['type']))
-    index = int(callback_data['index'])
-    me = await User.get(user_id=call.from_user.id)
-    user = await User.get(user_id=user_id)
-
-    async with state.proxy() as data:
-        users_list = data['users_list']
-        if action_type:
-            instance, created = await Rate.get_or_create(rate_owner=me, target=user, type=True)
-            if created:
-                await call.answer('Liked')
-                index = index + 1 if index < len(users_list)-1 else index - 1
-                await pair_likes(user, me, call)
-            else:
-                await instance.delete()
-                await call.answer('Like removed')
-        else:
-            rate = await Rate.filter(rate_owner=me, target=user, type=True).first()
-            if rate:
-                await rate.delete()
-            await Rate.create(rate_owner=me, target=user, type=False)
-            await call.answer('Disliked')
-            data['users_list'].pop(index)
-        if not users_list:
-            await call.message.delete()
-            await call.bot.send_message(chat_id=call.from_user.id, text='There are no users more')
-        user_info, photo_id, keyboard = await get_user_info(users_list[index], index, call.from_user.id)
-        await call.message.edit_media(
-            types.input_media.InputMediaPhoto(media=photo_id, caption=user_info),
-            reply_markup=keyboard)
+@dp.message_handler(Text(equals=['👎']), state=ListProfiles.main)
+async def like(m: types.Message, state: FSMContext):
+    if not await set_rate(m, state, False):
+        await m.answer('There are no any users more')
