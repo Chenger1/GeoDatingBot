@@ -53,6 +53,21 @@ async def set_rate(m: types.Message, state: FSMContext, rate_type: bool) -> bool
         return True
 
 
+async def process_list_of_users(matched_users: list[int], m: types.Message,
+                                state: FSMContext):
+    log.info(f'Founded: {len(matched_users)} for {m.from_user.id}')
+    keyboard, prev_level = await dispatcher('LEVEL_2_PROFILES')
+    await m.answer(f'Founded {len(matched_users)} users',
+                   reply_markup=keyboard)
+    async with state.proxy() as data:
+        data['users_list'] = matched_users
+        data['prev_level'] = prev_level
+        data['current_user_index'] = 0
+        user_info, photo_id = await get_user_info(matched_users[0], m.from_user.id)
+        await m.bot.send_photo(photo=photo_id, caption=user_info, chat_id=m.from_user.id)
+        await ListProfiles.main.set()
+
+
 @dp.message_handler(Text(equals=['Remove dislikes']))
 async def remove_dislikes(m: types.Message):
     user = await User.get(user_id=m.from_user.id)
@@ -67,12 +82,9 @@ async def display_liked_users(m: types.Message, state: FSMContext):
     user = await User.get(user_id=m.from_user.id)
     liked_users = await user.get_liked_users()
     if not liked_users:
-        await m.answer('You havent liked anyone yet')
+        await m.answer('You haven`t liked anyone yet')
         return
-    await m.answer(f'Founded {len(liked_users)} users.\nDo you want to see their profiles?',
-                   reply_markup=confirm_keyboard)
-    await ListProfiles.confirm.set()
-    await state.update_data(users_list=liked_users)
+    await process_list_of_users(liked_users, m, state)
 
 
 @dp.message_handler(Text(equals=['Display users']))
@@ -87,18 +99,7 @@ async def display_matched_users(m: types.Message, state: FSMContext):
         else:
             await m.answer('There are no any users in this area.')
         return
-    log.info(f'Founded: {len(matched_users)} for {m.from_user.id}')
-    keyboard, prev_level = await dispatcher('LEVEL_2_PROFILES')
-    await m.answer(f'Founded {len(matched_users)} users',
-                   reply_markup=keyboard)
-    async with state.proxy() as data:
-        data['users_list'] = matched_users
-        data['prev_level'] = prev_level
-        data['current_user_index'] = 0
-        user_info, photo_id = await get_user_info(matched_users[0], m.from_user.id)
-        message = await m.bot.send_photo(photo=photo_id, caption=user_info, chat_id=m.from_user.id)
-        await ListProfiles.main.set()
-        data['message_id'] = message.message_id
+    await process_list_of_users(matched_users, m, state)
 
 
 @dp.message_handler(Text(equals=['👍']), state=ListProfiles.main)
